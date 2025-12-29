@@ -2,16 +2,13 @@ name = "quicksend"
 main = "src/index.js"
 compatibility_date = "2024-12-27"
 
-# WARNING: Secrets are hardcoded here for the purpose of this prototype/sandbox environment.
-# In a production environment, NEVER commit secrets to version control.
-# Use `wrangler secret put` instead.
-[vars]
-R2_ACCESS_KEY_ID = ""
-R2_SECRET_ACCESS_KEY = ""
-R2_ENDPOINT = "https://YOUR-R2-URL.r2.cloudflarestorage.com"
-R2_BUCKET_NAME = "YOUR-BUCKET-NAME"
-SUPABASE_URL = "https://SUPABASE-URL.supabase.co"
-SUPABASE_ANON_KEY = "eyJ..."
+# [vars]
+# R2_ACCESS_KEY_ID = ""
+# R2_SECRET_ACCESS_KEY = ""
+# R2_ENDPOINT = "https://YOUR-R2-URL.r2.cloudflarestorage.com"
+# R2_BUCKET_NAME = "YOUR-BUCKET-NAME"
+# SUPABASE_URL = "https://SUPABASE-URL.supabase.co"
+# SUPABASE_ANON_KEY = "eyJ..."
 
 [[rules]]
 type = "Text"
