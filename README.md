@@ -32,7 +32,7 @@ QuickSend runs entirely on the edge, leveraging modern serverless technologies:
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:c-jeremy/quicksend.git
 cd quicksend
 npm install
 ```
