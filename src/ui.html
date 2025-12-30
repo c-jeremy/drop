@@ -1362,7 +1362,7 @@
     </div>
 
     <!-- Mascot Layer -->
-<div class="mascot-layer" @pointermove="handleDragMove($event)" @pointerup="handleDragEnd($event)">
+<div class="mascot-layer" @pointermove.window="handleDragMove($event)" @pointerup.window="handleDragEnd($event)">
     <template x-for="bot in mascots" :key="bot.id">
         <div class="mascot"
              :style="`left: ${bot.x}px; top: ${bot.y}px; --glow: ${bot.color}`"
@@ -1755,7 +1755,7 @@ receiveMascot(payload) {
     
     // Trigger effects
     if (navigator.vibrate) navigator.vibrate(30);
-}
+},
 
                 selectUser(user) {
                     if (user.id === this.myId) return;
