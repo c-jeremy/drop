@@ -1062,6 +1062,55 @@
             padding: 14px 20px;
         }
 
+        /* --- ELECTRO MASCOT --- */
+.mascot-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10000;
+}
+
+.mascot {
+    position: absolute;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    /* Glassy/Holographic look */
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(4px);
+    /* Glow */
+    box-shadow: 0 0 15px var(--glow), inset 0 0 10px rgba(255,255,255,0.1);
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    color: white;
+    text-shadow: 0 0 5px var(--glow);
+    
+    cursor: grab;
+    pointer-events: auto; /* Enable dragging */
+    touch-action: none;   /* Prevent scrolling on mobile */
+    will-change: transform;
+    
+    animation: mascot-breathe 4s ease-in-out infinite alternate;
+}
+
+.mascot:active { cursor: grabbing; }
+
+@keyframes mascot-breathe {
+    0% { transform: scale(1); box-shadow: 0 0 15px var(--glow); }
+    100% { transform: scale(1.05); box-shadow: 0 0 30px var(--glow), 0 0 5px white; }
+}
+
+/* Visual cue that the right wall is open */
+.portal-open-right {
+    box-shadow: inset -5px 0 20px var(--accent-glow) !important;
+    transition: box-shadow 0.5s ease;
+}
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .app-container {
@@ -1195,7 +1244,7 @@
         </div>
 
         <!-- Main Area -->
-        <div class="main-area">
+        <div class="main-area" :class="{'portal-open-right': selectedUser && selectedUser.id !== myId}">
             <div class="main-header" x-show="selectedUser">
                 <div class="selected-user-info">
                     <div class="user-avatar-wrapper">
@@ -1312,6 +1361,18 @@
         </div>
     </div>
 
+    <!-- Mascot Layer -->
+<div class="mascot-layer" @pointermove="handleDragMove($event)" @pointerup="handleDragEnd($event)">
+    <template x-for="bot in mascots" :key="bot.id">
+        <div class="mascot"
+             :style="`left: ${bot.x}px; top: ${bot.y}px; --glow: ${bot.color}`"
+             @pointerdown="startDrag($event, bot)">
+            <!-- Use the random number suffix for ID -->
+            <span x-text="bot.label"></span>
+        </div>
+    </template>
+</div>
+
     <!-- Incoming Modal -->
     <template x-if="incomingRequest">
         <div class="modal-overlay" @click.self="incomingRequest = null">
@@ -1410,6 +1471,10 @@
                 textMessage: '',
                 transmitting: false,
                 shaking: false,
+                mascots: [],
+                draggedBot: null,
+                dragOffset: { x: 0, y: 0 },
+                pointerHistory: [],
 
                 incomingRequest: null,
 
@@ -1549,7 +1614,148 @@
                                 this.connectionStatus = 'Disconnected';
                             }
                         });
+                    this.channel.on('broadcast', { event: 'mascot_transfer' }, (payload) => {
+    if (payload.payload.targetId === this.myId) {
+        this.receiveMascot(payload.payload);
+    }
+});
+
+// Spawn my own mascot
+this.spawnMascot();
+
+// Start physics loop
+requestAnimationFrame(() => this.physicsLoop());
                 },
+
+                // --- MASCOT LOGIC ---
+
+spawnMascot() {
+    // Extract numbers from "User-4821" -> "21"
+    const label = this.username.match(/\d+/) ? this.username.match(/\d+/)[0].slice(-2) : '??';
+    
+    // Pick a neon color
+    const colors = ['#f472b6', '#3b82f6', '#a855f7', '#22c55e', '#facc15'];
+    
+    this.mascots.push({
+        id: Math.random().toString(36),
+        label: label, 
+        color: colors[Math.floor(Math.random() * colors.length)],
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        vx: (Math.random() - 0.5) * 4, // Random drift
+        vy: (Math.random() - 0.5) * 4,
+        radius: 28 // half of 56px
+    });
+},
+
+physicsLoop() {
+    const friction = 0.99; // Float like a cloud (high friction)
+    const bounce = 0.8;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    this.mascots.forEach((bot, index) => {
+        if (this.draggedBot === bot) return;
+
+        // Apply inertia
+        bot.x += bot.vx;
+        bot.y += bot.vy;
+        bot.vx *= friction;
+        bot.vy *= friction;
+
+        // Floor/Ceiling bounce
+        if (bot.y < 0) { bot.y = 0; bot.vy *= -bounce; }
+        if (bot.y > height - 56) { bot.y = height - 56; bot.vy *= -bounce; }
+
+        // Left Wall bounce
+        if (bot.x < 0) { bot.x = 0; bot.vx *= -bounce; }
+
+        // Right Wall (THE PORTAL)
+        if (bot.x > width - 56) {
+            // Check if we are connected to someone
+            if (this.selectedUser && this.selectedUser.id !== this.myId) {
+                this.sendMascot(bot, index);
+            } else {
+                // Bounce back if no one selected
+                bot.x = width - 56;
+                bot.vx *= -bounce;
+            }
+        }
+    });
+
+    requestAnimationFrame(() => this.physicsLoop());
+},
+
+startDrag(e, bot) {
+    e.preventDefault();
+    this.draggedBot = bot;
+    this.dragOffset = { x: e.clientX - bot.x, y: e.clientY - bot.y };
+    this.pointerHistory = [];
+},
+
+handleDragMove(e) {
+    if (!this.draggedBot) return;
+    this.draggedBot.x = e.clientX - this.dragOffset.x;
+    this.draggedBot.y = e.clientY - this.dragOffset.y;
+    
+    // Track velocity
+    this.pointerHistory.push({ x: e.clientX, y: e.clientY, time: Date.now() });
+    if (this.pointerHistory.length > 5) this.pointerHistory.shift();
+},
+
+handleDragEnd(e) {
+    if (!this.draggedBot) return;
+    
+    // Calculate throw velocity
+    if (this.pointerHistory.length >= 2) {
+        const first = this.pointerHistory[0];
+        const last = this.pointerHistory[this.pointerHistory.length - 1];
+        const dt = last.time - first.time;
+        if (dt > 0) {
+            // "Throw" multiplier
+            this.draggedBot.vx = (last.x - first.x) / dt * 15; 
+            this.draggedBot.vy = (last.y - first.y) / dt * 15;
+        }
+    }
+    
+    this.draggedBot = null;
+},
+
+async sendMascot(bot, index) {
+    // Remove local
+    const mascotData = { ...bot };
+    this.mascots.splice(index, 1);
+    
+    // Send to Supabase
+    await this.channel.send({
+        type: 'broadcast',
+        event: 'mascot_transfer',
+        payload: {
+            targetId: this.selectedUser.id,
+            data: mascotData,
+            relY: bot.y / window.innerHeight // Send relative height
+        }
+    });
+    
+    // Trigger your existing effects
+    this.triggerElectromagneticImpact();
+},
+
+receiveMascot(payload) {
+    const data = payload.data;
+    
+    // Spawn on LEFT side
+    this.mascots.push({
+        ...data,
+        x: -60, 
+        y: payload.relY * window.innerHeight,
+        vx: Math.abs(data.vx) + 2, // Ensure it enters moving right
+        vy: data.vy
+    });
+    
+    // Trigger effects
+    if (navigator.vibrate) navigator.vibrate(30);
+}
 
                 selectUser(user) {
                     if (user.id === this.myId) return;
